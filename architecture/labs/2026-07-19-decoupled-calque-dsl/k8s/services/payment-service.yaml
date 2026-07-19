@@ -1,0 +1,15 @@
+# services/payment-service.yaml
+
+# @ocq:Macro(name="payment_env", args=[api_url], pipelines=[Replace(pattern="https://api.sandbox.stripe.com", with="${api_url}")])
+.template-02: &anchor02
+  - name: PAYMENT_PROVIDER
+    value: 'stripe'
+  - name: PAYMENT_API_URL
+    value: 'https://api.sandbox.stripe.com'
+# @ocq:EndMacro
+
+# @ocq:Strip(lines=1)
+items:
+# @ocq:MacroCall(name="payment_env", args=["https://api.stripe.com"])
+# @ocq:Remove(lines=1)
+<<: *anchor02

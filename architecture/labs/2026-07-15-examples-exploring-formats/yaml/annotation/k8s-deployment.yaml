@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  labels:
+    app: api-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+    spec:
+      containers:
+        - name: app
+          image: my-app:latest
+          ports:
+            # ==========================================
+            # DYNAMIC PORTS GENERATION (AOT LOOP)
+            # ==========================================
+            # @ocq:Repeat(
+            #   in=env.PORTS,
+            #   var="port",
+            #   if=(env.NAME == "production"),
+            #   replace="- containerPort: ${port}"
+            # )
+            - containerPort: 8080 # Local development fallback port
+          env:
+            - name: DB_URL
+              # ==========================================
+              # ENVIRONMENT CONFIGURATION (ACTIVE MOCK)
+              # ==========================================
+              # @ocq:Replace(if=(env.NAME == "production"), with="value: ${env.DB_URL}")
+              value: "sqlite://dev_database.db"

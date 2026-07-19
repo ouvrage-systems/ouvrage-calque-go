@@ -1,0 +1,15 @@
+# services/auth-service.yaml
+
+# @ocq:Macro(name="auth_env", args=[auth_url, auth_key], pipelines=[Replace(pattern="http://auth-service:8080", with="${auth_url}"), Replace(pattern="'secret-auth-key'", with="${auth_key}")])
+.template-01: &anchor01
+  - name: AUTH_URL
+    value: http://auth-service:8080
+  - name: AUTH_KEY
+    value: 'secret-auth-key'
+# @ocq:EndMacro
+
+# @ocq:Strip(lines=1)
+items:
+# @ocq:MacroCall(name="auth_env", args=["https://auth.company.com", "prod-secret-key"])
+# @ocq:Remove(lines=1)
+<<: *anchor01

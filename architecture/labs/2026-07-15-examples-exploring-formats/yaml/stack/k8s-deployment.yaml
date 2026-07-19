@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  labels:
+    app: api-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+    spec:
+      containers:
+        - name: app
+          image: my-app:latest
+          ports:
+            # ==========================================
+            # DYNAMIC PORTS GENERATION (AOT LOOP)
+            # ==========================================
+            # @ocalque:stdlib:for<port_loop> item="port" in="env.PORTS"
+            #   @ocalque:stdlib:if<prod_ports> --- "{{ env.NAME }}" == "production"
+            #     @ocalque:geometry:strip direction="next"
+            - containerPort: 80
+            #     @ocalque:geometry:strip direction="next"
+            #     @ocalque:replace_line --- - containerPort: {{ args.port.value }}
+            #   @ocalque:stdlib:else<prod_ports>
+            - containerPort: 8080 # Local development fallback port
+            #   @ocalque:stdlib:fi<prod_ports>
+            # @ocalque:stdlib:end<port_loop>
+          env:
+            - name: DB_URL
+              # ==========================================
+              # ENVIRONMENT CONFIGURATION (ACTIVE MOCK)
+              # ==========================================
+              # @ocalque:stdlib:if<prod_db> --- "{{ env.NAME }}" == "production"
+              #   @ocalque:geometry:strip direction="next"
+              value: "postgresql://siemens_prod:secret@db-prod.siemens.internal:5432/audit"
+              #   @ocalque:geometry:strip direction="next"
+              #   @ocalque:replace_line --- value: {{ env.DB_URL }}
+              # @ocalque:stdlib:else<prod_db>
+              value: "sqlite://dev_database.db"
+              # @ocalque:stdlib:fi<prod_db>

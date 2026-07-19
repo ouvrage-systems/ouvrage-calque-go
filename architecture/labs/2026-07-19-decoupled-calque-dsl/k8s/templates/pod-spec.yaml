@@ -1,0 +1,10 @@
+# templates/pod-spec.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ecomm-app
+spec:
+  containers:
+    - name: main-container
+      image: company/ecomm-app:v1.0
+      ENV_PLACEHOLDER
