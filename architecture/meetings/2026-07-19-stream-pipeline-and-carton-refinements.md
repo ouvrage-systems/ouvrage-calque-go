@@ -2,6 +2,7 @@
 
 ## Metadata
 * **Date**: July 19, 2026 (Late-night design session)
+* **Participants**: gpineda (Ouvrage Lead / Architect), Gemini (AI Exoskeleton / Design Partner)
 * **Topic**: Formalizing the Ostream stream protocol, Canvas/Calque envelope-payload mapping, and Carton's role as the project orchestrator.
 * **Status**: Decided and locked.
 
@@ -327,70 +328,137 @@ To preserve compile-time determinism, prevent infinite compilation loops, and av
 
 ---
 
-## 12. Multi-File Generation & Aggregation (Brainstorming)
+## 12. Multi-File Generation & Carton-Driven Aggregation (Brainstorming)
 
-We explored extending the compiler's capability from generating a single file (1:1 mapping) to generating a dynamic fleet of multiple output files (1:N mapping) from a case data sheet (such as a CSV or JSON manifest) or template.
+We defined the boundary between Ocalque (the single-stream compiler) and Carton (the multi-file orchestrator). We reject placing multi-file redirection directives (like `OutputFile`) inside Ocalque's DSL to prevent semantic responsibility bleed.
 
-### 12.1 The Virtual File System (VFS) Output Model
-Rather than compiling raw text directly to stdout, the compiler writes all output to an in-memory Virtual File System (VFS):
-*   **Single File (Default)**: If no output redirection is declared, the compiler writes to a default virtual file (which the CLI flushes to stdout).
-*   **Multi-File Redirection**: We introduce the **`OutputFile(path="...")`** Frame directive. When the engine processes this block, it redirects its output stream to a new virtual file in the VFS at the designated interpolated path.
-*   **Path Collisions (Append Mode)**: If multiple `OutputFile` directives target the same path during compilation, the compiler **appends** subsequent content to that file in sequence rather than overwriting it, allowing multi-stage file generation.
+### 12.1 The Single-Stream Compiler Model & Carton VFS
+Ocalque operates strictly as a **Single-Input, Single-Output stream processor**. It reads one Canvas stream, applies one Calque tree, and generates a single compiled output stream. 
 
-#### 12.2 Compiler Sections & Namespaced Aggregation (`RegisterOutput`)
+Managing multiple files, target disk directories, and file packaging is delegated entirely to **Carton**, which operates on a Memory Virtual File System (VFS):
+*   **Decoupled Paths**: Ocalque is blind to output file paths.
+*   **Orchestration (Carton)**: Carton reads its configuration manifest (`carton.yaml`), instantiates the VFS, maps input files to their respective Calque files, schedules Ocalque compilation runs in memory, and handles final disk flushing.
+
+##### 12.2 Compiler Sections & Namespaced Aggregation (`RegisterOutput`)
 To decouple the *generation of fragments* from the *final layout* of the compiled file (analogous to compiler sections like `.text` or `.data` in standard compilation linkers), we introduce isolated, namespaced in-memory registries:
 
-1.  **`RegisterOutput(name="...")`**: A Frame directive that accumulates generated text blocks into a named virtual registry/buffer inside the local module scope:
+1.  **`RegisterOutput(name="...")`**: A Frame directive that accumulates generated text blocks into a named virtual registry/buffer inside the local module scope. We use the **`Line`** Stroke directive to declare raw text lines:
     ```yaml
     # Sub-module A registers environment variables
     RegisterOutput(name="app.env_vars")
-      Append(content="- name: DB_USER")
-      Append(content="  value: admin")
+      Line("- name: DB_USER")
+      Line("  value: admin")
     EndRegisterOutput
     ```
-2.  **Referencing Namespaced Registries (`InsertOutput`)**: The master Calque template defines the target output file and explicitly inserts the registry of specific imported modules using the `alias:registry_name` namespace syntax, avoiding global collisions and implicit "magic" merges:
+2.  **Referencing Namespaced Registries (`InsertOutput`)**: The master Calque template inserts the registry of specific imported modules using the `alias:registry_name` namespace syntax, avoiding global collisions and implicit "magic" merges:
     ```yaml
     Import(source="sub_a.ocq", as="auth")
     
-    OutputFile(path="deploy/production.yaml")
-      # ... base template structure ...
-      Replace(pattern="ENV_PLACEHOLDER", with="env:")
-      # Inject the pre-compiled output specifically from the 'auth' module registry
-      InsertOutput(source="auth:app.env_vars", indent="+4")
-    EndOutputFile
+    # The Master Calque is a pure stream transform (no OutputFile directive):
+    Replace(pattern="ENV_PLACEHOLDER", with="env:")
+    # Inject the pre-compiled output specifically from the 'auth' module registry
+    InsertOutput(source="auth:app.env_vars", indent="+4")
     ```
 
 ### 12.3 Passive Imports & On-Demand Evaluation
 To preserve compiler determinism and ensure strict verification, we enforce the following rules:
-*   **Passive Imports**: The `Import` directive is **strictly passive**. It only loads the target file's AST and symbol signatures into the Symbol Table without evaluating it. Importing a Calque file does **not** trigger its `RegisterOutput` or `Var` execution at load time.
+*   **Passive Imports**: The `Import` directive is **strictly passive**. It only loads the target file's AST and symbol signatures into the Symbol Table without evaluating it. Importing a Calque file does **not** trigger its `RegisterOutput` execution at load time.
 *   **Static Link Verification**: If a Calque template calls `InsertOutput(source="alias:registry")`, the Linker (Pass 4) verifies that:
     1.  The alias `alias` is declared in the `Import` statements.
     2.  The imported file contains a `RegisterOutput` matching `registry`.
     If either check fails, compilation immediately terminates with a static link error.
 *   **Lazy On-Demand Evaluation**: The compiler evaluates imported Calques lazily. When the engine encounters `InsertOutput(source="alias:registry")` during evaluation, it compiles and runs the `alias` AST in its own isolated local scope (if not already evaluated). The output is written to the module's local VFS registry and immediately read and inserted by the caller.
 
-### 12.4 Fleet Generation Example
-Generating a separate configuration file for each node listed in a CSV database:
-```yaml
-Import(source="data.csv", as="fleet")
-Import(source="templates/server-blueprint.yaml", as="blueprint")
+### 12.4 Carton Fleet Generation Example
+To generate a separate configuration file for each node listed in a CSV database, Ocalque remains a single-stream processor while **Carton** orchestrates the looping and file generation using a native DSL loop:
 
-Loop(in=fleet.rows, var="srv", nodes=[
-  # Redirect output to a new virtual file per node
-  OutputFile(path="configs/node-${srv.name}.yaml")
-    # Apply node-specific transformations
-    Replace(pattern="IP_PLACEHOLDER", with="${srv.ip}")
-    Replace(pattern="ROLE_PLACEHOLDER", with="${srv.role}")
-    # Insert the common raw layout template
-    InsertFragment(source="blueprint")
-  EndOutputFile
-])
+```yaml
+# fleet.carton (Carton Bundle Config - Envelope + DSL Payload)
+apiVersion: ocalque.ouvrage.io/v1
+kind: Carton
+metadata:
+  name: server-fleet-generation
+spec: {}
+---
+# Carton Payload written in unified Ocalque DSL
+Import(source="data.csv", as="fleet")
+
+Loop(in=fleet.rows, var="srv")
+  Compile(
+    name="node_${srv.name}",
+    input="templates/server-blueprint.yaml",
+    calque="rules.ocq",
+    params=[
+      ip=srv.ip,
+      role=srv.role
+    ]
+  )
+  
+  WriteFile(
+    content=components["node_${srv.name}"].rendered,
+    path="configs/node-${srv.name}.yaml"
+  )
+EndLoop
+```
+
+The Ocalque stylesheet `rules.ocq` is generic and single-stream:
+```yaml
+# rules.ocq
+Replace(pattern="IP_PLACEHOLDER", with="${env.ip}")
+Replace(pattern="ROLE_PLACEHOLDER", with="${env.role}")
 ```
 
 ### 12.5 Pipeline Output Packaging
-At the end of the compilation, the resulting memory VFS contains all generated files. The calling orchestrator (like Carton) can:
-*   **Disk Write**: Write the files directly to their physical paths on disk.
+At the end of the orchestration, Carton's memory VFS contains all generated files. Carton can:
+*   **Disk Write**: Flush the VFS directly to their physical paths on disk.
 *   **Stream Write**: Package the generated files into a single, multi-document Ostream stream (as separate Canvas and Calque envelopes + payloads) for further pipeline processing.
+
+### 12.6 Carton Dataflow Graph Routing (Alloy-Style Declarative Bundles)
+Carton configuration files are standard Cloud-Native YAML resources. Rather than using rigid YAML for the execution payload, Carton's payload is written in **Ocalque DSL**. 
+
+SREs define decoupled execution components using clean directive statements, and Carton automatically builds the dependency DAG based on variable links, executes tasks in parallel where possible, and handles registry piping:
+
+```yaml
+# carton.yaml (Carton Bundle Config as a multi-document Ostream)
+apiVersion: ocalque.ouvrage.io/v1
+kind: Carton
+metadata:
+  name: deployment-bundle
+spec: {}
+---
+# Carton Payload in unified Ocalque DSL
+Compile(
+  name="auth",
+  input="services/auth-service.yaml",
+  calque="rules.ocq"
+)
+
+Compile(
+  name="payment",
+  input="services/payment-service.yaml",
+  calque="rules.ocq"
+)
+
+# Compile the master config, piping the auth/payment registries statically
+Compile(
+  name="master",
+  input="templates/pod-spec.yaml",
+  calque="deployment-master.ocq",
+  params=[
+    auth_env=auth.registries["app.env_vars"],
+    payment_env=payment.registries["app.env_vars"]
+  ]
+)
+
+# Flush the final rendered master config to the VFS
+WriteFile(
+  content=master.rendered,
+  path="deploy/kubernetes-deploy.yaml"
+)
+```
+
+*   **Topological Execution**: Carton parses the dataflow routing DSL payload, detects that `master` references outputs from `auth` and `payment` components, and schedules `auth` and `payment` in parallel first, before executing the master template compilation.
+*   **State Isolation**: Individual Ocalque runs remain stateless, mono-flux, and independent of disk writes. The dynamic state-pipening is managed exclusively by Carton's router.
 
 
 ---
@@ -515,8 +583,86 @@ Below is an ASCII schematic illustrating the decoupled compilation flow (Canvas/
  +---------------------------------------+
 ```
 
+---
 
+## 15. Metadata Extraction Pass & Build System Automation (Brainstorming)
 
+We explored leveraging Ocalque to dynamically generate build configurations (e.g., `CMakeLists.txt`, `Makefile`, or CI/CD pipelines) by statically scanning and extracting metadata written directly inside source code comments.
 
+### 15.1 The Metadata Render Pass (Pass 5 - Artifact of Evaluation)
+To support cases where metadata is injected or altered dynamically by pipelines or macros, metadata extraction cannot rely on a simple static text scan. It must be treated as an **artifact of the full evaluation pass (Pass 5)**:
+*   **Full AST Evaluation**: Ocalque executes the entire compilation flow (evaluating conditionals, macros, and pipelines) to resolve the final active state.
+*   **Metadata Harvesting**: During evaluation, instead of formatting and emitting the compiled text payload, the engine intercepts all `@ocq:Meta` nodes and registers them in a global `MetadataIndex` in the VFS context.
+*   **Optimization Fast-Path (`--ignore-runtime-metadata`)**: To accelerate builds on massive codebases where metadata is static and does not depend on runtime Canvas evaluation, we introduce the `--ignore-runtime-metadata` compiler flag. In this mode, Ocalque bypasses loading the Canvas files entirely, running only Passes 1-3 to harvest static metadata directly from headers in milliseconds.
+*   **The Output Index (JSON Mapping)**: The compiler writes the collected `MetadataIndex` to a structured JSON index (`build_index.json`) mapping source files to their resolved metadata:
+    ```json
+    {
+      "files": [
+        { "path": "src/helper.c", "meta": { "target": "core_engine" } },
+        { "path": "src/utils.c", "meta": { "target": "core_engine" } },
+        { "path": "src/main.c", "meta": { "target": "app_executable" } }
+      ]
+    }
+    ```
 
+### 15.2 Automated CMake Generation Example (Inline Canvas Annotations)
+Rather than writing CMake statements inside a naked `.ocq` file (which would violate the DSL parser), the build logic is written directly inside the `CMakeLists.txt` file (the Canvas) using native CMake comments (`#`). 
+
+To respect Lexical Scope Isolation (preventing ActionStrokes from leaking outside their enclosing blocks), the dev placeholder file is isolated inside the `# @ocq:Else` branch, avoiding the need for `Replace` entirely:
+
+```cmake
+# CMakeLists.txt (Canvas with inline annotations)
+cmake_minimum_required(VERSION 3.12)
+project(OuvrageCore)
+
+# @ocq:Import(source="build_index.json", as="index")
+
+add_library(core_engine STATIC
+  # @ocq:If(cond=(env.ENV_NAME == "production"))
+  # @ocq:Loop(in=index.files, var="f")
+  # @ocq:If(cond=(f.meta.target == "core_engine"))
+  # @ocq:Line(content="  ${f.path}")
+  # @ocq:EndIf
+  # @ocq:EndLoop
+  # @ocq:Else
+    src/placeholder.c
+  # @ocq:EndIf
+)
+
+add_executable(app_executable
+  # @ocq:If(cond=(env.ENV_NAME == "production"))
+  # @ocq:Loop(in=index.files, var="f")
+  # @ocq:If(cond=(f.meta.target == "app_executable"))
+  # @ocq:Line(content="  ${f.path}")
+  # @ocq:EndIf
+  # @ocq:EndLoop
+  # @ocq:Else
+    src/main_placeholder.c
+  # @ocq:EndIf
+)
+```
+
+### 15.3 Benefits of Build System Automation
+*   **Zero-Maintenance Builds**: Adding a new source file only requires writing `// @ocq:Meta(target="core_engine")` at the top of the C file. The next build cycle automatically regenerates the `CMakeLists.txt` with the file inserted.
+*   **Unified Build Target Declarations**: Build metadata is kept local to the source files, preventing the developer from having to manually sync changes across code, CMake configs, and CI/CD pipelines.
+
+### 15.4 Architectural Decision: Banning Mutable Variables (Stateless Pure Templates)
+To prevent Ocalque from devolving into a complex, turing-complete imperative programming environment (the "Helm Hell" anti-pattern), we establish a strict structural design choice:
+*   **No Mutable Variables**: Ocalque does not support reassignable variable declarations (e.g., `x = x + 1`). This guarantees that compilation is stateless, spatial-invariant (reordering blocks does not silently break variable dependencies), and fully predictable.
+*   **Upstream Data Preparation (Single Responsibility)**: Any complex data processing, indexing calculations, IP/subnet allocation, or capacity calculations must be executed **upstream** in the inventory generator (written in a proper programming language like Python, Go, or SQL) which outputs clean, static JSON/YAML inventories.
+*   **Immutable Constants (`Const` directive)**: To support DRY configurations without introducing stateful entropy, Ocalque permits declaring immutable constant bindings:
+    *   **Scope Isolation**: Constants are bound to their declaring Frame's lexical scope. Shadows in nested scopes are allowed.
+    *   **Immutability Enforcement**: Redefining an existing constant in the same scope immediately terminates compilation with a static `Compile-Time Redeclaration Error`.
+*   **Stateless Alternatives**: Simple sequential offsets (like port increments) are solved using built-in loop metadata (e.g., `loop.index`) and mathematical projections (e.g., `${8000 + (loop.index * 5)}`) rather than tracking mutable state.
+
+### 15.5 Bootstrapping Roadmap: Standalone Ocalque V1 vs. Carton V2 Orchestrator
+To accelerate the launch of the Ouvrage suite and validate core compiler stability, we establish a two-phased delivery roadmap:
+*   **Ocalque V1 (Self-Contained Compiler)**: Must be fully functional and usable independently. To support multi-file compilation before Carton is built, the Ocalque V1 syntax includes the `RedirectOutput(path="...")` and `RegisterOutput(name="...")` directives. When executed, Ocalque compiles the input stream into its in-memory VFS, and the CLI automatically flushes the entire virtual directory to the physical disk at the end of execution.
+*   **Carton V2 (Dataflow Orchestrator)**: Introduced as a subsequent platform scaling layer. It parses `.carton` files (Kubernetes YAML envelope + Ocalque DSL payload) to compile and coordinate multiple Ocalque runs in parallel, orchestrating the file-system writes and register bindings at a declarative graph level.
+
+### 15.6 R&D Governance & Transparent Meeting Records Strategy
+We formalize the strategic decision to maintain `/architecture/meetings/` as the primary workspace for R&D discussion records:
+*   **"Meeting" vs. "Journal" Taxonomy**: We select "Meeting Notes" over a formal "Journal" because meetings accommodate fluid, informal brainstorming—capturing raw ideas, architectural trade-offs, and discarded hypotheses without forcing rigid day-to-day logging.
+*   **Preparation for Future Community Syncs**: Using the Meeting structure prepares the repository for open governance as the Ouvrage association expands. Future human contributors will use this exact folder structure for Discord syncs, design reviews, and community architectural debates.
+*   **Radical Transparency & AI Exoskeleton Declaration**: We explicitly record all meeting participants in the metadata headers, including AI Design Partners/Exoskeletons (e.g. `Gemini (AI Exoskeleton / Design Partner)`). This ensures total intellectual honesty, showing how augmented engineering was leveraged to design the platform without any hidden generation or artificial pretense.
 

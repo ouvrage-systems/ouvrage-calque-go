@@ -2,6 +2,7 @@
 
 ## Metadata
 * **Date**: July 18, 2026
+* **Participants**: gpineda (Ouvrage Lead / Architect), Gemini (AI Exoskeleton / Design Partner)
 * **Topic**: Standardizing the vocabulary for `@ocq` compiler primitives (Canvas, Strokes, Frames) to stabilize the core parser and AST design in Go.
 * **Status**: Decided and locked.
 
