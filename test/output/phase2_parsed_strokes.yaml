@@ -1,0 +1,145 @@
+strokes:
+    - id: 9b67cdd6a6bc
+      name: Import
+      role: Content
+      geo:
+        startline: 4
+        endline: 4
+        indent: 0
+      prattTree:
+        as:
+            type: GenericLiteralNode
+            value: auth_env
+        source:
+            type: GenericLiteralNode
+            value: services/auth-service.yaml
+    - id: f392dc162028
+      name: Import
+      role: Content
+      geo:
+        startline: 5
+        endline: 5
+        indent: 0
+      prattTree:
+        as:
+            type: GenericLiteralNode
+            value: payment_env
+        source:
+            type: GenericLiteralNode
+            value: services/payment-service.yaml
+    - id: 37bff931cc1d
+      name: Import
+      role: Content
+      geo:
+        startline: 8
+        endline: 11
+        indent: 0
+      prattTree:
+        as:
+            type: GenericLiteralNode
+            value: pod_blueprint
+        source:
+            type: GenericLiteralNode
+            value: templates/pod-spec.yaml
+    - id: ac39640a27c9
+      name: Section
+      role: Open
+      geo:
+        startline: 14
+        endline: 29
+        indent: 0
+      prattTree:
+        name:
+            type: GenericLiteralNode
+            value: inject_env
+        pipeline:
+            elements:
+                - args:
+                    - left:
+                        name: nodes
+                        type: GenericIdentifierNode
+                      op: =
+                      right:
+                        elements:
+                            - args:
+                                - left:
+                                    name: cond
+                                    type: GenericIdentifierNode
+                                  op: =
+                                  right:
+                                    left:
+                                        name: line.content
+                                        type: GenericIdentifierNode
+                                    op: contains
+                                    right:
+                                        type: GenericLiteralNode
+                                        value: ENV_PLACEHOLDER
+                                    type: GenericBinaryNode
+                                  type: GenericBinaryNode
+                                - left:
+                                    name: nodes
+                                    type: GenericIdentifierNode
+                                  op: =
+                                  right:
+                                    elements:
+                                        - args:
+                                            - left:
+                                                name: with
+                                                type: GenericIdentifierNode
+                                              op: =
+                                              right:
+                                                type: GenericLiteralNode
+                                                value: ""
+                                              type: GenericBinaryNode
+                                          function: Replace
+                                          type: GenericCallNode
+                                        - args:
+                                            - left:
+                                                name: source
+                                                type: GenericIdentifierNode
+                                              op: =
+                                              right:
+                                                type: GenericLiteralNode
+                                                value: auth_env
+                                              type: GenericBinaryNode
+                                          function: InsertFragment
+                                          type: GenericCallNode
+                                        - args:
+                                            - left:
+                                                name: source
+                                                type: GenericIdentifierNode
+                                              op: =
+                                              right:
+                                                type: GenericLiteralNode
+                                                value: payment_env
+                                              type: GenericBinaryNode
+                                          function: InsertFragment
+                                          type: GenericCallNode
+                                    type: GenericListNode
+                                  type: GenericBinaryNode
+                              function: If
+                              type: GenericCallNode
+                        type: GenericListNode
+                      type: GenericBinaryNode
+                  function: ForEachLine
+                  type: GenericCallNode
+            type: GenericListNode
+    - id: 0df5381cfbdf
+      name: InsertFragment
+      role: Content
+      geo:
+        startline: 30
+        endline: 30
+        indent: 2
+      prattTree:
+        source:
+            type: GenericLiteralNode
+            value: pod_blueprint
+    - id: 9c53c8dbfbf3
+      name: EndSection
+      role: Close
+      geo:
+        startline: 31
+        endline: 31
+        indent: 0
+      prattTree: {}

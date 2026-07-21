@@ -2,6 +2,4 @@
 
 Import(source="build.bat", as="build_script")
 
-OutputFile(path="deploy/build-prod.bat")
-  InsertFragment(source="build_script")
-EndOutputFile
+InsertFragment(source="build_script")

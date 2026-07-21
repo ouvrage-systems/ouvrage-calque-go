@@ -1,0 +1,70 @@
+astNodes:
+    - type: ImportNode
+      id: 9b67cdd6a6bc
+      geo:
+        startLine: 4
+        endLine: 4
+      properties:
+        as: auth_env
+        source: services/auth-service.yaml
+    - type: ImportNode
+      id: f392dc162028
+      geo:
+        startLine: 5
+        endLine: 5
+      properties:
+        as: payment_env
+        source: services/payment-service.yaml
+    - type: ImportNode
+      id: 37bff931cc1d
+      geo:
+        startLine: 8
+        endLine: 11
+      properties:
+        as: pod_blueprint
+        source: templates/pod-spec.yaml
+    - type: SectionFrameNode
+      id: ac39640a27c9
+      geo:
+        startLine: 14
+        endLine: 31
+      properties:
+        name: inject_env
+        pipeline:
+            - type: ForEachLineNode
+              id: 42f9e0100028
+              properties:
+                nodes:
+                    - type: IfFrameNode
+                      id: 298cb212a34d
+                      properties:
+                        branches:
+                            - branchIndex: 0
+                              condition:
+                                _expr: line.content contains "ENV_PLACEHOLDER"
+                                left:
+                                    var: line.content
+                                op: contains
+                                right:
+                                    literal: ENV_PLACEHOLDER
+                              nodes:
+                                - type: ReplaceNode
+                                  id: 381c66d5a18b
+                                  properties:
+                                    with: ""
+                                - type: InsertFragmentNode
+                                  id: f8ba53665c7f
+                                  properties:
+                                    source: auth_env
+                                - type: InsertFragmentNode
+                                  id: 0d519e1b3da5
+                                  properties:
+                                    source: payment_env
+      children:
+        - type: InsertFragmentNode
+          id: 0df5381cfbdf
+          geo:
+            startLine: 30
+            endLine: 30
+          properties:
+            source: pod_blueprint

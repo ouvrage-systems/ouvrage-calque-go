@@ -1,0 +1,35 @@
+annotations:
+    - id: 9b67cdd6a6bc
+      geo: {startline: 4, endline: 4, indent: 0}
+      rawContent: Import(source="services/auth-service.yaml", as="auth_env")
+    - id: f392dc162028
+      geo: {startline: 5, endline: 5, indent: 0}
+      rawContent: Import(source="services/payment-service.yaml", as="payment_env")
+    - id: 37bff931cc1d
+      geo: {startline: 8, endline: 11, indent: 0}
+      rawContent: |-
+        Import(
+            source="templates/pod-spec.yaml",
+            as="pod_blueprint"
+        )
+    - id: ac39640a27c9
+      geo: {startline: 14, endline: 29, indent: 0}
+      rawContent: |-
+        Section(
+          name="inject_env",
+          pipeline=[
+            ForEachLine(nodes=[
+              If(cond=(line.content contains "ENV_PLACEHOLDER"), nodes=[
+                Replace(with=""),
+                InsertFragment(source="auth_env"),
+                InsertFragment(source="payment_env")
+              ])
+            ])
+          ]
+        )
+    - id: 0df5381cfbdf
+      geo: {startline: 30, endline: 30, indent: 2}
+      rawContent: InsertFragment(source="pod_blueprint")
+    - id: 9c53c8dbfbf3
+      geo: {startline: 31, endline: 31, indent: 0}
+      rawContent: EndSection

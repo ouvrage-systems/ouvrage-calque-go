@@ -1,0 +1,31 @@
+# deployment-master.ocq
+
+# A. Importation des configurations de services (CanvasFragments bruts auto-paramétrés)
+Import(source="services/auth-service.yaml", as="auth_env")
+Import(source="services/payment-service.yaml", as="payment_env")
+
+# B. Importation du template de base (CanvasFragment inerte)
+Import(
+    source="templates/pod-spec.yaml",
+    as="pod_blueprint"
+)
+
+# C. Évaluation du squelette avec notre pipeline de bloc
+Section(
+  name="inject_env",
+  pipeline=[
+    ForEachLine(nodes=[
+      # Remplacement géométrique du placeholder et injection des fragments auto-évalués
+      If(cond=(line.content contains "ENV_PLACEHOLDER"), nodes=[
+        # On efface la ligne du placeholder mais on garde son indentation de base
+        Replace(with=""),
+        # Insère le fragment d'authentification (s'auto-évalue en prod via son MacroCall interne)
+        InsertFragment(source="auth_env"),
+        # Insère le fragment de paiement (s'auto-évalue en prod via son MacroCall interne)
+        InsertFragment(source="payment_env")
+      ])
+    ])
+  ]
+)
+  InsertFragment(source="pod_blueprint")
+EndSection

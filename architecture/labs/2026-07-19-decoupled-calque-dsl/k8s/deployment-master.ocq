@@ -1,27 +1,27 @@
 # deployment-master.ocq
 
-# A. Importation des configurations de services (CanvasFragments bruts auto-paramétrés)
+# A. Import service configurations (raw auto-parameterized CanvasFragments)
 Import(source="services/auth-service.yaml", as="auth_env")
 Import(source="services/payment-service.yaml", as="payment_env")
 
-# B. Importation du template de base (CanvasFragment inerte)
+# B. Import base template (inert CanvasFragment)
 Import(source="templates/pod-spec.yaml", as="pod_blueprint")
 
-# C. Redirection du rendu final vers le fichier de production dans le VFS
+# C. Redirect final rendering to the production file in the VFS
 OutputFile(path="deploy/kubernetes-deploy.yaml")
   
-  # Évaluation récursive du squelette avec notre pipeline de bloc
+  # Recursive skeleton evaluation using our block pipeline
   Section(
     name="inject_env",
     pipeline=[
       ForEachLine(nodes=[
-        # Remplacement géométrique du placeholder et injection des fragments auto-évalués
+        # Geometric placeholder replacement and injection of self-evaluated fragments
         If(cond=(line.content contains "ENV_PLACEHOLDER"), nodes=[
-          # On efface la ligne du placeholder mais on garde son indentation de base (14 espaces)
+          # Remove the placeholder line while keeping its base indentation (14 spaces)
           Replace(with=""),
-          # Insère le fragment d'authentification (s'auto-évalue en prod via son MacroCall interne)
+          # Insert authentication fragment (self-evaluates in prod via its internal MacroCall)
           InsertFragment(source="auth_env"),
-          # Insère le fragment de paiement (s'auto-évalue en prod via son MacroCall interne)
+          # Insert payment fragment (self-evaluates in prod via its internal MacroCall)
           InsertFragment(source="payment_env")
         ])
       ])
