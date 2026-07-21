@@ -1,7 +1,7 @@
 # ADR 002: Configuration Compilation vs. Text Generation
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 For over a decade, the software industry has treated systems configuration (YAML, TOML, XML) and SRE deployment scripts (Bash, SQL) as plain, flat text. To manage variations across environments, developers adopted web-oriented template engines (such as Jinja or Go templates) designed for dynamic web-page rendering.

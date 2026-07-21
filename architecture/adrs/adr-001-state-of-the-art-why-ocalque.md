@@ -1,7 +1,7 @@
 # ADR 001: State of the Art & Why ocalque
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 Traditional configuration and code template engines (e.g., Jinja, EJS, Helm, Gomplate) interleave template DSL logic (such as `{{ if .Values.prod }}`) directly into the source files. While functional, this approach introduces several severe engineering drawbacks:

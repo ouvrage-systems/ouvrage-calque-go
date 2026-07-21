@@ -1,7 +1,7 @@
 # ADR 004: Decoupling Lexer and Transformer via Calque IR
 
 ## Status
-Accepted
+Superseded by [ADR 007](adr-007-direct-ast-and-naked-calque-dsl.md)
 
 ## Context
 We want `ocalque` to be highly versatile and support:

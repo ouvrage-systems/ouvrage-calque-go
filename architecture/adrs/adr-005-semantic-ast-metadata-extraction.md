@@ -1,7 +1,7 @@
 # ADR 005: Semantic AST, Namespaced Directives, and Geometric Calibration
 
 ## Status
-Accepted
+Superseded by [ADR 008](adr-008-banning-mutable-variables-and-ast-matrix.md)
 
 ## Context
 Traditional template engines treat code and configuration files as flat, meaningless text streams. When generating large-scale infrastructure scripts or SRE runbooks:

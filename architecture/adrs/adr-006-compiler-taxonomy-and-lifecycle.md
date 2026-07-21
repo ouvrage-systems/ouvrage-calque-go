@@ -1,7 +1,7 @@
 # ADR 006: Compiler Taxonomy and Lifecycle (Canvas, Calque, Stroke, Frame)
 
 ## Status
-Accepted
+Superseded by [ADR 009](adr-009-five-pass-compiler-lifecycle-and-vfs.md)
 
 ## Context
 In previous design iterations, terms like "Directive", "Annotation", "BlockNode", and "LeafNode" were used interchangeably. This created conceptual confusion between:

@@ -1,7 +1,7 @@
 # ADR 003: Active Shadow Mocks Pattern
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 When templating files for different environments (e.g., local dev vs. production), we often need to include or exclude specific block configurations, files, dependencies, or names. 
